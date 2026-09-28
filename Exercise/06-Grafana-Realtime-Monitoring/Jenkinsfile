@@ -1,0 +1,87 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME = "delivery_metrics"
+        PROMETHEUS_PORT = "9090"
+        GRAFANA_PORT = "3000"
+        APP_PORT = "8000"
+    }
+
+    stages {
+        stage('Pre-check Docker') {
+            steps {
+                script {
+                    try {
+                        def dockerVersion = sh(script: 'docker --version', returnStdout: true).trim()
+                        if (!dockerVersion) {
+                            error "Docker is not installed or not in PATH."
+                        }
+                        def dockerInfo = sh(script: 'docker info', returnStatus: true)
+                        if (dockerInfo != 0) {
+                            error "Docker daemon is not running."
+                        }
+                        echo "Docker is available: ${dockerVersion}"
+                    } catch (Exception e) {
+                        error "Pre-check failed: ${e.message}"
+                    }
+                }
+            }
+        }
+
+        stage('Setup Workspace') {
+            steps {
+                script {
+                    echo "Setting up workspace files..."
+                    sh """
+                    ls -la
+                    """
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "Building application image..."
+                sh "docker build -t ${APP_NAME}:latest ."
+            }
+        }
+
+        stage('Run Application') {
+            steps {
+                echo "Starting delivery metrics application container..."
+                sh """
+                docker stop ${APP_NAME} 2>/dev/null || true
+                docker rm ${APP_NAME} 2>/dev/null || true
+                docker run -d -p ${APP_PORT}:8000 --name ${APP_NAME} ${APP_NAME}:latest
+                """
+            }
+        }
+
+        stage('Run Prometheus & Grafana') {
+            steps {
+                echo "Starting Prometheus and Grafana monitoring stack..."
+                sh """
+                docker stop prometheus grafana 2>/dev/null || true
+                docker rm prometheus grafana 2>/dev/null || true
+
+                docker run -d --name prometheus -p ${PROMETHEUS_PORT}:9090 \
+                  -v \$(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+                  -v \$(pwd)/alert_rules.yml:/etc/prometheus/alert_rules.yml \
+                  prom/prometheus
+
+                docker run -d --name grafana -p ${GRAFANA_PORT}:3000 grafana/grafana
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Monitoring pipeline completed successfully! Prometheus is at http://localhost:9090 and Grafana at http://localhost:3000"
+        }
+        failure {
+            echo "Pipeline failed. Review build logs."
+        }
+    }
+}
