@@ -1,0 +1,2 @@
+# Standard library unittest is used; flake8 for code quality checks
+flake8>=6.0.0

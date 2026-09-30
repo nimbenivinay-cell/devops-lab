@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source repository...'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                echo 'Installing required dependencies...'
+                sh 'pip install -r sample-ci-app/requirements.txt || true'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running automated test suite...'
+                sh 'python3 -m unittest discover -s sample-ci-app -p "test_*.py"'
+            }
+        }
+
+        stage('Build & Package') {
+            steps {
+                echo 'Packaging application artifact...'
+                sh '''
+                mkdir -p dist
+                cp -r sample-ci-app dist/
+                tar -czf dist/sample-ci-app.tar.gz sample-ci-app
+                echo "Package built at dist/sample-ci-app.tar.gz"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Continuous Integration Pipeline Completed Successfully! Code is ready for deployment.'
+        }
+        failure {
+            echo 'Continuous Integration Pipeline FAILED. Notify engineering team immediately.'
+        }
+    }
+}
