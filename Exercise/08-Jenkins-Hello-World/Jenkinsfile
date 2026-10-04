@@ -1,0 +1,21 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Execute Hello World') {
+            steps {
+                echo 'Running hello-world script...'
+                sh 'sh hello-world.sh'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Hello World Job completed successfully!'
+        }
+        failure {
+            echo 'Hello World Job failed.'
+        }
+    }
+}
